@@ -156,9 +156,8 @@ export default function Home() {
           clearTimeout(timeoutRef.current);
       }
 
-      // Calculate random delay (e.g., between 3 and 20 seconds)
-      // This makes the timing more varied and less predictable.
-      const randomDelay = Math.random() * 17000 + 3000; // 3000ms (3s) to 20000ms (20s)
+      // Calculate random delay (e.g., between 1 and 7 seconds)
+      const randomDelay = Math.random() * 6000 + 1000; // 1000ms (1s) to 7000ms (7s)
       console.log(`Next data generation in ${Math.round(randomDelay / 1000)} seconds`);
 
       timeoutRef.current = setTimeout(() => {
