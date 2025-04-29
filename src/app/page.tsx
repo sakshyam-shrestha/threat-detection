@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { ActivityLog } from '@/components/activity-log'; // Custom icon component
@@ -93,15 +93,16 @@ export default function Home() {
   const [latestAlert, setLatestAlert] = useState<Activity | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref to hold the timeout ID
 
   const processData = useCallback(async (data: Activity) => {
-    if (isProcessing) return; // Prevent concurrent processing
+    // No need to check isProcessing here as setTimeout manages concurrency
 
-    setIsProcessing(true);
+    setIsProcessing(true); // Indicate start of processing a single item
     console.log(`Processing data: ${data.id} - Type: ${data.type} - ${data.description}`);
 
-    // Simulate some backend work
-    await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay for quicker log update
+    // Simulate some backend work - keep this short for UI responsiveness
+    await new Promise(resolve => setTimeout(resolve, 50)); // Short delay for visual update
 
     // Update activity log state immutably
     setActivityLog(prevLog => [data, ...prevLog.slice(0, 99)]); // Keep log size manageable
@@ -135,23 +136,46 @@ export default function Home() {
       }
     }
 
-    setIsProcessing(false);
-  }, [toast, isProcessing]); // Added isProcessing dependency
+    setIsProcessing(false); // Indicate end of processing
+  }, [toast]); // Removed isProcessing dependency
 
-  // Simulate receiving new data
+  // Function to schedule the next data generation
+  const scheduleNextData = useCallback(() => {
+      // Clear any existing timeout before setting a new one
+      if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+      }
+
+      // Calculate random delay (e.g., between 5 and 15 seconds)
+      const randomDelay = Math.random() * 10000 + 5000; // 5000ms (5s) to 15000ms (15s)
+      console.log(`Next data generation in ${Math.round(randomDelay / 1000)} seconds`);
+
+      timeoutRef.current = setTimeout(() => {
+          const newData = generateFakeData();
+          processData(newData).then(() => {
+              // Schedule the next one *after* the current one has been processed
+              scheduleNextData();
+          });
+      }, randomDelay);
+  }, [processData]); // processData is stable due to useCallback
+
+
+  // Simulate receiving new data with random intervals
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      const newData = generateFakeData();
-      processData(newData);
-    }, 5000); // Generate data every 5 seconds
-
-    // Load initial data point
+    // Load initial data point immediately
     const initialData = generateFakeData();
-    processData(initialData);
+    processData(initialData).then(() => {
+        // Then start the random scheduling
+        scheduleNextData();
+    });
 
-
-    return () => clearInterval(intervalId); // Cleanup on unmount
-  }, [processData]);
+    // Cleanup function to clear the timeout when the component unmounts
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [processData, scheduleNextData]); // Add scheduleNextData dependency
 
 
   return (
@@ -177,7 +201,7 @@ export default function Home() {
              {/* Use ScrollArea for consistent scrollbars */}
              <ScrollArea className="h-[600px] p-4 border border-input rounded-md bg-secondary/30"> {/* Theme border, input, secondary bg */}
                  {activityLog.length === 0 && !isProcessing && <p className="text-muted-foreground italic text-center py-4">No activity logged yet...</p>}
-                 {/* Show skeleton loaders more appropriately */}
+                 {/* Show skeleton loader only when processing the very first item */}
                  {isProcessing && activityLog.length === 0 && (
                     <div className="space-y-3">
                         <Skeleton className="h-16 w-full" />
