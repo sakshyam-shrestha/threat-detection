@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Node Threat Sentinel',
+  title: 'DarkScout AI',
   description: 'Threat Detection and Analysis PoC',
 };
 
