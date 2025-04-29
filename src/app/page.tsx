@@ -169,7 +169,7 @@ export default function Home() {
         const newData = generateFakeData();
         processData(newData);
       }
-    }, 10000); // Generate data every 10 seconds
+    }, 5000); // Generate data every 5 seconds
 
     // Initial data load
     for (let i = 0; i < 5; i++) {
