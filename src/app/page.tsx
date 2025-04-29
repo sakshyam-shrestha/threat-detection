@@ -1,24 +1,20 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { ActivityLog } from '@/components/activity-log'; // Custom icon component
 import { useToast } from "@/hooks/use-toast";
 import { sendEmail } from '@/services/email';
-import { assessImpact } from '@/ai/flows/impact-assessment';
-import { summarizeThreat } from '@/ai/flows/threat-summary';
-import { suggestedRemediation } from '@/ai/flows/suggested-remediation';
 import type { Activity } from '@/types/activity';
-import { AlertCircle, ShieldCheck, Cpu, Network, Server, Database, BarChart, Terminal } from 'lucide-react';
+import { AlertCircle, ShieldCheck, Cpu, Network, Server, Database, Terminal } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Simulate data generation (replace with actual data source)
 const generateFakeData = (): Activity => {
   // Make suspicious activity less frequent to simulate more realistic threat scenarios
-  const isSuspicious = Math.random() < 0.1; // 10% chance of suspicious activity
+  const isSuspicious = Math.random() < 0.2; // 20% chance of suspicious activity
   const timestamp = new Date();
   const activities = [
     'User Login',
@@ -95,9 +91,7 @@ const getIconForSystem = (system: string) => {
 export default function Home() {
   const [activityLog, setActivityLog] = useState<Activity[]>([]);
   const [latestAlert, setLatestAlert] = useState<Activity | null>(null);
-  const [aiAnalysis, setAiAnalysis] = useState<{ summary: string; impact: number; remediation: string[] } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
 
   const processData = useCallback(async (data: Activity) => {
@@ -106,9 +100,8 @@ export default function Home() {
     setIsProcessing(true);
     console.log(`Processing data: ${data.id} - Type: ${data.type} - ${data.description}`);
 
-    // Simulate AI model processing (replace with actual Python call if needed)
-    // Keeping a short delay to simulate some backend work without blocking UI too long
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Simulate some backend work
+    await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay for quicker log update
 
     // Update activity log state immutably
     setActivityLog(prevLog => [data, ...prevLog.slice(0, 99)]); // Keep log size manageable
@@ -116,11 +109,9 @@ export default function Home() {
     if (data.type === 'suspicious') {
       console.log(`Suspicious activity detected: ${data.description}`);
       setLatestAlert(data);
-      setIsAnalyzing(true);
-      setAiAnalysis(null); // Reset previous analysis
 
       try {
-        // Simulate sending email alert FIRST (critical step)
+        // Send email alert
         await sendEmail({
           to: 'admin@example.com', // Replace with actual admin email
           subject: `Suspicious Activity Detected: ${data.activity}`,
@@ -134,69 +125,33 @@ export default function Home() {
           variant: "default", // Use default variant for info
         });
 
-        // Trigger GenAI flows AFTER alert is sent
-        const [summaryResult, impactResult, remediationResult] = await Promise.all([
-          summarizeThreat({ threatDescription: data.description }),
-          assessImpact({
-            behaviorDescription: data.description,
-            affectedSystem: data.system,
-            potentialVulnerability: 'Unknown/Simulated', // Provide context if available
-          }),
-          suggestedRemediation({
-            threatDescription: data.description,
-            threatCategory: data.activity, // Use activity type as category for simplicity
-            affectedSystem: data.system,
-          }),
-        ]);
-
-        setAiAnalysis({
-          summary: summaryResult.summary,
-          impact: impactResult.impactScore,
-          remediation: remediationResult.suggestedActions,
-        });
-
-        toast({
-          title: "AI Analysis Complete",
-          description: "Threat summary, impact assessment, and remediation steps generated.",
-          variant: "default", // Use default variant
-        });
-
       } catch (error) {
-        console.error("Error during alert or AI processing:", error);
+        console.error("Error sending alert email:", error);
         toast({
-          title: "Processing Error",
-          description: `Failed to process alert for ${data.id}. Check console.`, // More specific error
+          title: "Alert Error",
+          description: `Failed to send email alert for ${data.id}. Check console.`,
           variant: "destructive",
         });
-        setAiAnalysis({ // Provide fallback error state
-          summary: "Error during AI analysis.",
-          impact: -1, // Indicate error state clearly
-          remediation: ["Manual investigation required due to processing error."],
-        });
-      } finally {
-        setIsAnalyzing(false);
       }
     }
-    // No need for 'else' block to clear alerts if requirement is to keep the last alert displayed
 
     setIsProcessing(false);
   }, [toast, isProcessing]); // Added isProcessing dependency
 
-  // Simulate receiving new data at a slower, more manageable pace
+  // Simulate receiving new data
   useEffect(() => {
     const intervalId = setInterval(() => {
-      // No need to check isProcessing here, the check is inside processData
       const newData = generateFakeData();
       processData(newData);
-    }, 15000); // Generate data every 15 seconds
+    }, 5000); // Generate data every 5 seconds
 
-    // Load only one initial data point to avoid overwhelming the view at start
+    // Load initial data point
     const initialData = generateFakeData();
     processData(initialData);
 
 
     return () => clearInterval(intervalId); // Cleanup on unmount
-  }, [processData]); // processData depends on isProcessing, so this effect reruns safely
+  }, [processData]);
 
 
   return (
@@ -256,7 +211,7 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        {/* Alerts and AI Analysis */}
+        {/* Alerts */}
         <div className="space-y-6">
           {/* Latest Alert Card */}
           <Card className="bg-card shadow-lg rounded-lg border border-border">
@@ -284,68 +239,6 @@ export default function Home() {
                 <p className="text-muted-foreground italic text-center py-4">No suspicious activity detected recently.</p>
               )}
             </CardContent>
-          </Card>
-
-          {/* AI Analysis Card */}
-          <Card className="bg-card shadow-lg rounded-lg border border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-card-foreground">
-                 <BarChart className="h-6 w-6 text-primary"/> AI Analysis
-              </CardTitle>
-              <CardDescription className="text-muted-foreground">GenAI insights on the latest alert.</CardDescription>
-            </CardHeader>
-            <CardContent className="min-h-[150px]"> {/* Ensure minimum height */}
-              {isAnalyzing && (
-                 <div className="space-y-4 pt-2">
-                    <Skeleton className="h-4 w-3/4" />
-                     <Skeleton className="h-4 w-1/2" />
-                     <Skeleton className="h-4 w-full" />
-                     <Skeleton className="h-4 w-5/6" />
-                     <Skeleton className="h-4 w-full" />
-                 </div>
-              )}
-              {!isAnalyzing && aiAnalysis && (
-                <div className="space-y-4">
-                   <div>
-                      <h4 className="font-semibold text-foreground mb-1">Impact Score:</h4>
-                      {/* Use theme colors based on score */}
-                      <p className={`text-xl font-bold ${aiAnalysis.impact === -1 ? 'text-muted-foreground' : aiAnalysis.impact > 70 ? 'text-destructive' : aiAnalysis.impact > 40 ? 'text-yellow-600' : 'text-green-600'}`}>
-                         {aiAnalysis.impact >= 0 ? `${aiAnalysis.impact} / 100` : 'Analysis Error'}
-                      </p>
-                   </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-1">Threat Summary:</h4>
-                    <p className="text-sm text-muted-foreground">{aiAnalysis.summary}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-1">Suggested Remediation:</h4>
-                    <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 pl-2">
-                      {aiAnalysis.remediation.map((step, index) => (
-                        <li key={index}>{step}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-              {/* Clearer states when no analysis is available */}
-              {!isAnalyzing && !aiAnalysis && latestAlert && (
-                 <p className="text-muted-foreground italic text-center py-4">Waiting for AI analysis results...</p>
-              )}
-               {!isAnalyzing && !aiAnalysis && !latestAlert && (
-                 <p className="text-muted-foreground italic text-center py-4">No alert detected to analyze.</p>
-               )}
-            </CardContent>
-             <CardFooter>
-                 {/* Button styling using theme variants */}
-                 <Button
-                     onClick={() => latestAlert && processData(latestAlert)} // Re-analyze the latest alert
-                     disabled={!latestAlert || isAnalyzing || isProcessing}
-                     size="sm"
-                     variant="outline" // Use outline variant
-                   >
-                     {isAnalyzing ? 'Analyzing...' : 'Re-Analyze Latest Alert'}
-                 </Button>
-             </CardFooter>
           </Card>
         </div>
       </div>
