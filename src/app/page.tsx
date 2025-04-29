@@ -106,7 +106,7 @@ export default function Home() {
       setIsProcessing(true); // Indicate start of processing a single item
       console.log(`Processing data: ${data.id} - Type: ${data.type}`);
 
-      // Simulate short processing delay
+      // Simulate short processing delay (this doesn't affect the generation interval)
       await new Promise(resolve => setTimeout(resolve, 50));
 
       if (!isMounted.current) { // Check again after delay
@@ -145,7 +145,7 @@ export default function Home() {
           }
       }
       setIsProcessing(false); // Indicate end of processing
-  }, [toast]); // Removed isProcessing dependency, added isMounted
+  }, [toast]);
 
   // Function to schedule the next data generation
   const scheduleNextData = useCallback(() => {
@@ -156,8 +156,8 @@ export default function Home() {
           clearTimeout(timeoutRef.current);
       }
 
-      // Calculate random delay (e.g., between 1 and 7 seconds)
-      const randomDelay = Math.random() * 6000 + 1000; // 1000ms (1s) to 7000ms (7s)
+      // Calculate random delay (e.g., between 0 and 7 seconds)
+      const randomDelay = Math.random() * 7000; // 0ms to 7000ms (7s)
       console.log(`Next data generation in ${Math.round(randomDelay / 1000)} seconds`);
 
       timeoutRef.current = setTimeout(() => {
@@ -203,7 +203,10 @@ export default function Home() {
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8"> {/* Use theme background/foreground */}
       <header className="mb-8">
         <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
-          <ShieldCheck className="h-8 w-8 text-accent" />
+            {/* Custom SVG Logo */}
+            <svg width="131" height="63" viewBox="0 0 131 63" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-8 w-auto">
+              <path fillRule="evenodd" clipRule="evenodd" d="M53.8476 1.30809C37.0207 4.38157 17.9635 14.7968 4.71513 28.16L0 32.9161L8.26916 33.275C12.8172 33.4729 21.834 33.6668 28.3068 33.7065L40.0758 33.7789L40.4447 36.2628C41.2905 41.9513 46.0198 49.1153 51.3127 52.7254C65.7997 62.6074 85.6901 54.9027 90.4053 37.5824L91.3274 34.1954L104.678 34.3116C112.02 34.376 118.159 34.5613 118.32 34.7229C119.216 35.626 104.647 45.5724 96.9487 49.3137C84.6391 55.2962 74.5581 57.6126 60.7355 57.6357C50.6392 57.6523 45.6532 56.9034 37.3538 54.1244C32.7972 52.5989 23.2563 48.1 19.2472 45.5874C14.8052 42.8032 16.7505 44.5853 22.0718 48.1759C32.5006 55.2122 43.8254 59.9032 54.7487 61.7106C63.4256 63.1464 74.4948 62.5913 82.6916 60.3082C99.369 55.6637 113.408 47.4229 126.236 34.7505L131 30.0434L128.802 29.6856C127.593 29.4888 117.463 29.1719 106.29 28.9815L85.9759 28.6352L85.7055 32.8885C85.3514 38.4521 83.3936 42.5323 79.2425 46.3588C75.2128 50.0742 71.2157 51.6112 65.583 51.6112C59.9959 51.6112 55.948 50.0696 52.0147 46.4433C49.0019 43.6661 46.4116 39.2776 45.6429 35.6485L45.2471 33.7789H51.3081H57.3697L72.8821 27.3559C81.4136 23.8228 88.5113 20.8356 88.6545 20.7177C89.2288 20.2437 86.5125 16.1164 83.7306 13.235C79.8778 9.24517 73.9673 6.36038 68.1339 5.6235C64.4937 5.16331 65.1615 5.11327 72.7116 5.27778C80.3135 5.44403 82.4692 5.71324 88.1093 7.2008C95.6308 9.18363 102.479 11.9718 108.913 15.67C111.377 17.0868 113.475 18.1642 113.574 18.0641C113.938 17.6971 103.079 10.8225 98.4606 8.49622C92.2399 5.36234 83.4546 2.46143 76.7458 1.32535C70.2856 0.231824 59.7837 0.223771 53.8476 1.30809ZM54.1772 6.69574C40.471 9.65935 28.321 15.5066 15.968 25.0854L12.5463 27.739L18.8195 28.0973C22.2697 28.2941 32.1499 28.4701 40.7755 28.4879L56.4584 28.5207L68.4344 23.4995C76.0232 20.3173 80.4104 18.1803 80.4104 17.6649C80.4104 16.4287 74.8815 12.7984 71.2374 11.6422C66.9921 10.2956 61.3218 10.7264 56.9945 12.7248C52.9534 14.5908 48.6871 19.0271 47.011 23.1055L45.6982 26.3009H43.1656H40.6329L40.9985 24.4314C42.4915 16.794 49.9292 9.24231 58.7196 6.43976C61.9902 5.39686 59.5476 5.53491 54.1772 6.69574Z" fill="currentColor"/>
+            </svg>
           Node Threat Sentinel
         </h1>
         <p className="text-muted-foreground">Real-time Threat Detection & Analysis PoC</p>
