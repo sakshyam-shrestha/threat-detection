@@ -53,11 +53,13 @@ const generateFakeData = (): Activity => {
   let generatedType: 'normal' | 'suspicious' = isSuspicious ? 'suspicious' : 'normal';
   let generatedDescription = descriptions[descriptionIndex];
 
+  // Simplified logic: Rely purely on the random chance + specific keywords for suspicious type
   if (generatedDescription.includes('DROP TABLE') || generatedDescription.includes('malicious IP') || generatedDescription.includes('Disabled firewall')) {
     generatedType = 'suspicious';
-  } else if (!isSuspicious && Math.random() < 0.05) { // Occasionally mark non-obvious things as suspicious
-    generatedType = 'suspicious';
-    generatedDescription = 'Unusual pattern detected: ' + generatedDescription;
+  } else if (generatedType === 'normal' && Math.random() < 0.05) {
+     // Occasionally mark non-obvious things as suspicious if initial check was normal
+     generatedType = 'suspicious';
+     generatedDescription = 'Unusual pattern detected: ' + generatedDescription;
   }
 
 
@@ -91,91 +93,111 @@ const getIconForSystem = (system: string) => {
 export default function Home() {
   const [activityLog, setActivityLog] = useState<Activity[]>([]);
   const [latestAlert, setLatestAlert] = useState<Activity | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false); // Tracks if *any* processing is happening
   const { toast } = useToast();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref to hold the timeout ID
+  const isMounted = useRef(true); // Track mount status
 
-  const processData = useCallback(async (data: Activity) => {
-    // No need to check isProcessing here as setTimeout manages concurrency
 
-    setIsProcessing(true); // Indicate start of processing a single item
-    console.log(`Processing data: ${data.id} - Type: ${data.type} - ${data.description}`);
+  // This function handles processing a single data item
+  const processSingleData = useCallback(async (data: Activity) => {
+      if (!isMounted.current) return; // Don't process if unmounted
 
-    // Simulate some backend work - keep this short for UI responsiveness
-    await new Promise(resolve => setTimeout(resolve, 50)); // Short delay for visual update
+      setIsProcessing(true); // Indicate start of processing a single item
+      console.log(`Processing data: ${data.id} - Type: ${data.type}`);
 
-    // Update activity log state immutably
-    setActivityLog(prevLog => [data, ...prevLog.slice(0, 99)]); // Keep log size manageable
+      // Simulate short processing delay
+      await new Promise(resolve => setTimeout(resolve, 50));
 
-    if (data.type === 'suspicious') {
-      console.log(`Suspicious activity detected: ${data.description}`);
-      setLatestAlert(data);
-
-      try {
-        // Send email alert
-        await sendEmail({
-          to: 'admin@example.com', // Replace with actual admin email
-          subject: `Suspicious Activity Detected: ${data.activity}`,
-          html: `<p>Suspicious activity detected:</p>
-                 <pre>${JSON.stringify(data, null, 2)}</pre>
-                 <p>Please investigate immediately.</p>`,
-        });
-        toast({
-          title: "Alert Sent",
-          description: `Email notification sent for suspicious activity: ${data.description.substring(0, 50)}...`,
-          variant: "default", // Use default variant for info
-        });
-
-      } catch (error) {
-        console.error("Error sending alert email:", error);
-        toast({
-          title: "Alert Error",
-          description: `Failed to send email alert for ${data.id}. Check console.`,
-          variant: "destructive",
-        });
+      if (!isMounted.current) { // Check again after delay
+        setIsProcessing(false);
+        return;
       }
-    }
 
-    setIsProcessing(false); // Indicate end of processing
-  }, [toast]); // Removed isProcessing dependency
+      // Update activity log state immutably
+      setActivityLog(prevLog => [data, ...prevLog.slice(0, 99)]); // Keep log size manageable
+
+      if (data.type === 'suspicious') {
+          console.log(`Suspicious activity detected: ${data.description}`);
+          setLatestAlert(data);
+
+          try {
+              // Send email alert
+              await sendEmail({
+                  to: 'admin@example.com', // Replace with actual admin email
+                  subject: `Suspicious Activity Detected: ${data.activity}`,
+                  html: `<p>Suspicious activity detected:</p>
+                         <pre>${JSON.stringify(data, null, 2)}</pre>
+                         <p>Please investigate immediately.</p>`,
+              });
+              toast({
+                  title: "Alert Sent",
+                  description: `Email notification sent for suspicious activity: ${data.description.substring(0, 50)}...`,
+                  variant: "default",
+              });
+          } catch (error) {
+              console.error("Error sending alert email:", error);
+              toast({
+                  title: "Alert Error",
+                  description: `Failed to send email alert for ${data.id}. Check console.`,
+                  variant: "destructive",
+              });
+          }
+      }
+      setIsProcessing(false); // Indicate end of processing
+  }, [toast]); // Removed isProcessing dependency, added isMounted
 
   // Function to schedule the next data generation
   const scheduleNextData = useCallback(() => {
+      if (!isMounted.current) return; // Don't schedule if unmounted
+
       // Clear any existing timeout before setting a new one
       if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
       }
 
-      // Calculate random delay (e.g., between 5 and 15 seconds)
-      const randomDelay = Math.random() * 10000 + 5000; // 5000ms (5s) to 15000ms (15s)
+      // Calculate random delay (e.g., between 3 and 20 seconds)
+      // This makes the timing more varied and less predictable.
+      const randomDelay = Math.random() * 17000 + 3000; // 3000ms (3s) to 20000ms (20s)
       console.log(`Next data generation in ${Math.round(randomDelay / 1000)} seconds`);
 
       timeoutRef.current = setTimeout(() => {
+        if (!isMounted.current) return; // Check mount status before generating/processing
           const newData = generateFakeData();
-          processData(newData).then(() => {
+          processSingleData(newData).then(() => {
               // Schedule the next one *after* the current one has been processed
               scheduleNextData();
+          }).catch(error => {
+             console.error("Error processing data:", error);
+             // Optionally schedule next one even on error, or implement retry logic
+             scheduleNextData();
           });
       }, randomDelay);
-  }, [processData]); // processData is stable due to useCallback
+  }, [processSingleData]); // Depend on processSingleData
 
-
-  // Simulate receiving new data with random intervals
+  // Effect for initialization and cleanup
   useEffect(() => {
-    // Load initial data point immediately
-    const initialData = generateFakeData();
-    processData(initialData).then(() => {
-        // Then start the random scheduling
-        scheduleNextData();
-    });
+      isMounted.current = true; // Component is mounted
 
-    // Cleanup function to clear the timeout when the component unmounts
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [processData, scheduleNextData]); // Add scheduleNextData dependency
+      // Load initial data point immediately
+      const initialData = generateFakeData();
+      processSingleData(initialData).then(() => {
+          // Then start the random scheduling if still mounted
+          if (isMounted.current) {
+             scheduleNextData();
+          }
+      });
+
+      // Cleanup function to clear the timeout and mark as unmounted
+      return () => {
+          isMounted.current = false; // Mark as unmounted
+          if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+          }
+          console.log("Component unmounted, clearing data generation timeout.");
+      };
+      // Ensure dependencies are correct and stable
+  }, [processSingleData, scheduleNextData]);
 
 
   return (
