@@ -9,5 +9,5 @@ export interface Activity {
   userId?: string;
   system: string; // e.g., 'Firewall', 'Auth Server', 'Database'
   activity: string; // e.g., 'Login Attempt', 'File Access', 'Query Execution'
-  data?: Record<string, any>; // Additional context-specific data
+  data?: Record<string, any>;
 }
